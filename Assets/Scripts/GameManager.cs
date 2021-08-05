@@ -54,6 +54,7 @@ public class GameManager : MonoBehaviour
         {
             Destroy(hit.collider.gameObject);
             Indices.Remove(hit.collider.gameObject);
+            descriptionText.text = "Solving " + Indices.Count + " point problem";
         }
     }
 

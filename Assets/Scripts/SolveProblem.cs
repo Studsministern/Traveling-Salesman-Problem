@@ -24,26 +24,11 @@ public class SolveProblem : MonoBehaviour
 
     // The time for starting solve
     private float startTime;
-    private float lastFrame;
-    private bool isStarted = false;
 
     void Start()
     {
         // Finding the game manager
         gameManager = GameObject.Find("Game Manager").GetComponent<GameManager>();
-    }
-
-    void Update()
-    {   
-        if(isStarted)
-        {
-            UpdateText();
-        }
-
-        if (currentSolution == totalSolutions)
-        {
-            isStarted = false;
-        }
     }
 
     public void Solve()
@@ -52,8 +37,9 @@ public class SolveProblem : MonoBehaviour
         int count = gameManager.Indices.Count;
         indices = new int[count];
         bestTourIndices = new int[count];
+        bestTourDst = float.MaxValue;
+
         startTime = Time.time;
-        isStarted = true;
         
         for (int i = 0; i < count; i++)
         {
@@ -63,13 +49,23 @@ public class SolveProblem : MonoBehaviour
 
         gameObjectIndices = gameManager.Indices.ToArray();
 
-        bestTourDst = float.MaxValue;
-        currentSolution = 0;
-        totalSolutions = Factorial(count - 1) / 2;
+        // Exception for three of fewer indices
+        if (count <= 3)
+        {
+            currentSolution = 1;
+            totalSolutions = 1;
+            FewIndicesSolution();
+        }
+        // For four or more indices
+        else
+        {
+            currentSolution = 0;
+            totalSolutions = Factorial(count - 1) / 2;
 
-        /// Call with length - 1 to keep one element fixed in place. This avoids wasting time
-        /// evaluating tours that are identical except for beginning at a different point
-        GenerateSolutions(indices, indices.Length - 1);
+            /// Call with length - 1 to keep one element fixed in place. This avoids wasting time
+            /// evaluating tours that are identical except for beginning at a different point
+            GenerateSolutions(indices, indices.Length - 1);
+        }
     }
 
     // Heap's algoritm for generating all permutations
@@ -77,7 +73,7 @@ public class SolveProblem : MonoBehaviour
     {
         if (n == 1)
         {
-            StartCoroutine(EvaluateSolution());
+            EvaluateSolution();
         } else
         {
             for (int i = 0; i < n; i++)
@@ -89,16 +85,8 @@ public class SolveProblem : MonoBehaviour
         }
     }
 
-    private IEnumerator EvaluateSolution()
-    {   
-        // Check if one frame has passed
-        if (Time.time - 0.02 > lastFrame)
-        {
-            lastFrame = Time.time;
-            yield return new WaitForEndOfFrame();
-            Debug.Log(Time.time);
-        }
-        
+    private void EvaluateSolution()
+    {
         // Ignore solutions which are just the reverse of another solution
         if (indices[0] < indices[indices.Length - 2])
         {
@@ -123,6 +111,23 @@ public class SolveProblem : MonoBehaviour
                 System.Array.Copy(indices, bestTourIndices, indices.Length);
             }
         }
+
+        UpdateText();
+    }
+
+    private void FewIndicesSolution()
+    {
+        float tourDst = 0;
+        for (int i = 0; i < indices.Length; i++)
+        {
+            // Starts from 0 --> 1, ends at indices.Length --> 0
+            int nextIndex = (i + 1) % indices.Length;
+            tourDst += LookUpDistance(indices[i], indices[nextIndex]);
+        }
+        bestTourDst = tourDst;
+        System.Array.Copy(indices, bestTourIndices, indices.Length);
+
+        UpdateText();
     }
 
     private float LookUpDistance(int index1, int index2)
