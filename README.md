@@ -1,4 +1,4 @@
-# Traveling-Salesman-Problem
+# Travelling-Salesman-Problem
 Project created with Unity 2020.03
 
 Program for finding the best solution to the traveling salesman problem for a certain number of indicies.
