@@ -139,14 +139,11 @@ public class SolveProblem : MonoBehaviour
 
     private int Factorial(int n)
     {
-        int sum = 1;
-        
-        for (int i = n; i > 0; i--)
+        if (n == 1)
         {
-            sum *= i;
+            return 1;
         }
-
-        return sum;
+        return n * Factorial(n - 1);
     }
 
     private void UpdateText()
