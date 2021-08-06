@@ -21,6 +21,7 @@ public class SolveProblem : MonoBehaviour
     // The ratio of completed solutions compared to the total
     private float currentSolution;
     private float totalSolutions;
+    [SerializeField] private int calculcationsBeforeUpdate = 500;
 
     // The time for starting solve
     private float startTime;
@@ -33,14 +34,13 @@ public class SolveProblem : MonoBehaviour
 
     public void Solve()
     {
-        // Intialize and reset currentSolutions, totalSolutions, indices and gameObjectIndices
+        // Intialize variables
         int count = gameManager.Indices.Count;
         indices = new int[count];
         bestTourIndices = new int[count];
         bestTourDst = float.MaxValue;
 
-        startTime = Time.time;
-        
+        // Assign value to indices, bestTourIndices and gameObjectIndices
         for (int i = 0; i < count; i++)
         {
             indices[i] = i;
@@ -48,6 +48,9 @@ public class SolveProblem : MonoBehaviour
         }
 
         gameObjectIndices = gameManager.Indices.ToArray();
+
+        // The time for starting
+        startTime = Time.time;
 
         // Exception for three of fewer indices
         if (count <= 3)
@@ -60,56 +63,144 @@ public class SolveProblem : MonoBehaviour
         else
         {
             currentSolution = 0;
-            totalSolutions = Factorial(count - 1) / 2;
+            totalSolutions = Factorial(count - 1);
 
+            /// Lexicographic Order
+            /// Using the lexicographic properties of the array to find all possible combinations
+            StartCoroutine(LexicographicSolutions(indices.Length - 1));
+
+            /// Heap's algoritm
             /// Call with length - 1 to keep one element fixed in place. This avoids wasting time
             /// evaluating tours that are identical except for beginning at a different point
-            GenerateSolutions(indices, indices.Length - 1);
+            //totalSolutions /= 2;
+            //GenerateSolutions(indices.Length - 1);
         }
     }
 
-    // Heap's algoritm for generating all permutations
-    private void GenerateSolutions(int[] indices, int n)
+    private IEnumerator LexicographicSolutions(int n)
+    {
+        while (currentSolution < totalSolutions && !Input.GetKeyDown(KeyCode.Escape))
+        {
+            //Debug.Log((currentSolution + 1) + ": [" + string.Join(",", indices) + "].");
+
+            // STEP 1: Find largest x where P[x] < P[x+1]
+            int largestX = -1;
+            for (int x = n - 1; x >= 0; x--)
+            {
+                if (indices[x] < indices[x + 1])
+                {
+                    largestX = x;
+                    break;
+                }
+            }
+
+            if (largestX == -1)
+            {
+                Debug.Log("A problem has occured with largestX");
+                break;
+            }
+
+            // STEP 2: Find largest y where P[x] < P[y]
+            int largestY = -1;
+            for (int y = n; y >= 0; y--)
+            {
+                if (indices[largestX] < indices[y])
+                {
+                    largestY = y;
+                    break;
+                }
+            }
+
+            if (largestY == -1)
+            {
+                Debug.Log("A problem has occured with largestY");
+                break;
+            }
+
+            // STEP 3: Swap P[x] with P[y]
+            (indices[largestX], indices[largestY]) = (indices[largestY], indices[largestX]);
+
+            // STEP 4: Reverse from P[x+1] to n
+            Reverse(indices, largestX + 1);
+
+            // Calculate the length of the solution
+            EvaluateSolution();
+
+            // Update the program
+            if(currentSolution % calculcationsBeforeUpdate == 0)
+            {
+                yield return null;
+            }
+        }
+    }
+
+    private void Reverse(int[] array, int index)
+    {
+        // Temporary array to store the inverted numbers
+        int[] tempArray = new int[array.Length - index];
+        int tempArrayIndex = 0;
+
+        // Store the numbers in inverted order
+        for(int i = array.Length - 1; i >= index; i--)
+        {
+            tempArray[tempArrayIndex] = array[i];
+            tempArrayIndex++;
+        }
+
+        // Reverse the first array
+        for (int i = array.Length - 1; i >= index; i--)
+        {
+            array[i] = tempArray[tempArrayIndex - 1];
+            tempArrayIndex--;
+        }
+    }
+
+    private void GenerateSolutions(int n)
     {
         if (n == 1)
         {
-            EvaluateSolution();
+            EvaluateSolutionHeap();
         } else
         {
             for (int i = 0; i < n; i++)
             {
-                GenerateSolutions(indices, n - 1);
+                GenerateSolutions(n - 1);
                 int swapIndex = (n % 2 == 0) ? i : 0;
                 (indices[swapIndex], indices[n - 1]) = (indices[n - 1], indices[swapIndex]);
             }
         }
     }
 
-    private void EvaluateSolution()
+    private void EvaluateSolutionHeap()
     {
         // Ignore solutions which are just the reverse of another solution
         if (indices[0] < indices[indices.Length - 2])
         {
-            // Add to the current solution
-            currentSolution++;
+            EvaluateSolution();
+        }
+    }
 
-            // Calculate length of the path (including returning to start point)
-            float tourDst = 0;
-            for (int i = 0; i < indices.Length; i++)
-            {
-                // Starts from 0 --> 1, ends at indices.Length --> 0
-                int nextIndex = (i + 1) % indices.Length;
-                tourDst += LookUpDistance(indices[i], indices[nextIndex]);
-            }
+    private void EvaluateSolution()
+    {
+        // Add to the current solution
+        currentSolution++;
 
-            // Save the path indices if this is the best solution found so far
-            if (tourDst < bestTourDst)
-            {
-                bestTourDst = tourDst;
+        // Calculate length of the path (including returning to start point)
+        float tourDst = 0;
+        for (int i = 0; i < indices.Length; i++)
+        {
+            // Starts from 0 --> 1, ends at indices.Length --> 0
+            int nextIndex = (i + 1) % indices.Length;
+            tourDst += LookUpDistance(indices[i], indices[nextIndex]);
+        }
+
+        // Save the path indices if this is the best solution found so far
+        if (tourDst < bestTourDst)
+        {
+            bestTourDst = tourDst;
                 
-                // Copy over one array to another
-                System.Array.Copy(indices, bestTourIndices, indices.Length);
-            }
+            // Copy over one array to another
+            System.Array.Copy(indices, bestTourIndices, indices.Length);
         }
 
         UpdateText();
@@ -149,7 +240,7 @@ public class SolveProblem : MonoBehaviour
     private void UpdateText()
     {   
         completionText.text = currentSolution + " / " + totalSolutions + "\n"
-                            + Math.Round(currentSolution / totalSolutions * 100, 2) + " % \n"
+                            + Math.Round(currentSolution / totalSolutions * 100, 4) + " % \n"
                             + Math.Round(Time.time - startTime, 2) + " seconds \n"
                             + Math.Round(bestTourDst, 2) + " km";
     }

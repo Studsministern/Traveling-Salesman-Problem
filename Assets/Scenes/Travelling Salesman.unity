@@ -263,6 +263,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   completionText: {fileID: 1283750884}
+  calculcationsBeforeUpdate: 500
 --- !u!1 &397000733
 GameObject:
   m_ObjectHideFlags: 0
