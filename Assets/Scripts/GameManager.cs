@@ -10,9 +10,17 @@ public class GameManager : MonoBehaviour
     public List<GameObject> Indices { get; private set; }
 
     private readonly int rayLength = 10;
+
+    private LineController lc;
+    private SolveProblem sp;
     
     void Start()
     {
+        // Components
+        lc = GameObject.Find("Line Renderer").GetComponent<LineController>();
+        sp = GetComponent<SolveProblem>();
+
+        // Initialise and update
         Indices = new List<GameObject>();
         UpdateIndices();
     }
@@ -55,6 +63,8 @@ public class GameManager : MonoBehaviour
             Destroy(hit.collider.gameObject);
             Indices.Remove(hit.collider.gameObject);
             descriptionText.text = "Solving " + Indices.Count + " point problem";
+            sp.StopSolving();
+            lc.ClearLine();
         }
     }
 
@@ -71,6 +81,10 @@ public class GameManager : MonoBehaviour
             }
         }
 
+        // Update text
         descriptionText.text = "Solving " + Indices.Count + " point problem";
+
+        sp.StopSolving();
+        lc.ClearLine();
     }
 }

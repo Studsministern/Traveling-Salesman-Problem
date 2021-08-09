@@ -19,17 +19,22 @@ public class SolveProblem : MonoBehaviour
     private float bestTourDst;
 
     // The ratio of completed solutions compared to the total
-    private float currentSolution;
-    private float totalSolutions;
+    private long currentSolution;
+    private long totalSolutions;
     [SerializeField] private int calculcationsBeforeUpdate = 500;
 
     // The time for starting solve
     private float startTime;
 
+    // The Line Controller for drawing the line
+    [SerializeField] private LineRenderer lineRenderer;
+    private LineController lc;
+
     void Start()
     {
-        // Finding the game manager
+        // Finding the game manager and Line Controller
         gameManager = GameObject.Find("Game Manager").GetComponent<GameManager>();
+        lc = lineRenderer.GetComponent<LineController>();
     }
 
     public void Solve()
@@ -47,7 +52,9 @@ public class SolveProblem : MonoBehaviour
             bestTourIndices[i] = i;
         }
 
+        gameObjectIndices = new GameObject[count];
         gameObjectIndices = gameManager.Indices.ToArray();
+        lc.SetUpLine(gameObjectIndices);
 
         // The time for starting
         startTime = Time.time;
@@ -63,17 +70,11 @@ public class SolveProblem : MonoBehaviour
         else
         {
             currentSolution = 0;
-            totalSolutions = Factorial(count - 1);
+            totalSolutions = Factorial(count - 1) / 2;
 
             /// Lexicographic Order
             /// Using the lexicographic properties of the array to find all possible combinations
             StartCoroutine(LexicographicSolutions(indices.Length - 1));
-
-            /// Heap's algoritm
-            /// Call with length - 1 to keep one element fixed in place. This avoids wasting time
-            /// evaluating tours that are identical except for beginning at a different point
-            //totalSolutions /= 2;
-            //GenerateSolutions(indices.Length - 1);
         }
     }
 
@@ -129,9 +130,13 @@ public class SolveProblem : MonoBehaviour
             // Update the program
             if(currentSolution % calculcationsBeforeUpdate == 0)
             {
+                lc.UpdateLine(bestTourIndices);
                 yield return null;
             }
         }
+
+        // Update drawing of the line after everything has been completed
+        lc.UpdateLine(bestTourIndices);
     }
 
     private void Reverse(int[] array, int index)
@@ -155,55 +160,34 @@ public class SolveProblem : MonoBehaviour
         }
     }
 
-    private void GenerateSolutions(int n)
-    {
-        if (n == 1)
-        {
-            EvaluateSolutionHeap();
-        } else
-        {
-            for (int i = 0; i < n; i++)
-            {
-                GenerateSolutions(n - 1);
-                int swapIndex = (n % 2 == 0) ? i : 0;
-                (indices[swapIndex], indices[n - 1]) = (indices[n - 1], indices[swapIndex]);
-            }
-        }
-    }
-
-    private void EvaluateSolutionHeap()
+    private void EvaluateSolution()
     {
         // Ignore solutions which are just the reverse of another solution
         if (indices[0] < indices[indices.Length - 2])
         {
-            EvaluateSolution();
+            // Add to the current solution
+            currentSolution++;
+
+            // Calculate length of the path (including returning to start point)
+            float tourDst = 0;
+            for (int i = 0; i < indices.Length; i++)
+            {
+                // Starts from 0 --> 1, ends at indices.Length --> 0
+                int nextIndex = (i + 1) % indices.Length;
+                tourDst += LookUpDistance(indices[i], indices[nextIndex]);
+            }
+
+            // Save the path indices if this is the best solution found so far
+            if (tourDst < bestTourDst)
+            {
+                bestTourDst = tourDst;
+
+                // Copy over one array to another
+                System.Array.Copy(indices, bestTourIndices, indices.Length);
+            }
+
+            UpdateText();
         }
-    }
-
-    private void EvaluateSolution()
-    {
-        // Add to the current solution
-        currentSolution++;
-
-        // Calculate length of the path (including returning to start point)
-        float tourDst = 0;
-        for (int i = 0; i < indices.Length; i++)
-        {
-            // Starts from 0 --> 1, ends at indices.Length --> 0
-            int nextIndex = (i + 1) % indices.Length;
-            tourDst += LookUpDistance(indices[i], indices[nextIndex]);
-        }
-
-        // Save the path indices if this is the best solution found so far
-        if (tourDst < bestTourDst)
-        {
-            bestTourDst = tourDst;
-                
-            // Copy over one array to another
-            System.Array.Copy(indices, bestTourIndices, indices.Length);
-        }
-
-        UpdateText();
     }
 
     private void FewIndicesSolution()
@@ -219,16 +203,22 @@ public class SolveProblem : MonoBehaviour
         System.Array.Copy(indices, bestTourIndices, indices.Length);
 
         UpdateText();
+        lc.UpdateLine(bestTourIndices);
     }
 
     private float LookUpDistance(int index1, int index2)
     {
-        float dx = gameObjectIndices[index1].transform.position.x - gameObjectIndices[index2].transform.position.x;
-        float dy = gameObjectIndices[index1].transform.position.y - gameObjectIndices[index2].transform.position.y;
-        return Mathf.Sqrt(Mathf.Pow(dx, 2) + Mathf.Pow(dy, 2));
+        if (gameObjectIndices[index1] != null && gameObjectIndices[index2] != null)
+        {
+            float dx = gameObjectIndices[index1].transform.position.x - gameObjectIndices[index2].transform.position.x;
+            float dy = gameObjectIndices[index1].transform.position.y - gameObjectIndices[index2].transform.position.y;
+            return Mathf.Sqrt(Mathf.Pow(dx, 2) + Mathf.Pow(dy, 2));
+        }
+
+        return 0;
     }
 
-    private int Factorial(int n)
+    private long Factorial(int n)
     {
         if (n == 1)
         {
@@ -237,11 +227,40 @@ public class SolveProblem : MonoBehaviour
         return n * Factorial(n - 1);
     }
 
+    public void StopSolving()
+    {
+        StopAllCoroutines();
+    }
+
     private void UpdateText()
     {   
         completionText.text = currentSolution + " / " + totalSolutions + "\n"
-                            + Math.Round(currentSolution / totalSolutions * 100, 4) + " % \n"
+                            + Math.Round(((double)currentSolution / totalSolutions * 100), 4) + " % \n"
                             + Math.Round(Time.time - startTime, 2) + " seconds \n"
                             + Math.Round(bestTourDst, 2) + " km";
     }
 }
+
+
+
+/// Heap's algoritm
+/// Call with length - 1 to keep one element fixed in place. This avoids wasting time
+/// evaluating tours that are identical except for beginning at a different point
+//totalSolutions /= 2;
+//GenerateSolutions(indices.Length - 1);
+
+/* private void GenerateSolutions(int n)
+    {
+        if (n == 1)
+        {
+            EvaluateSolutionHeap();
+        } else
+        {
+            for (int i = 0; i < n; i++)
+            {
+                GenerateSolutions(n - 1);
+                int swapIndex = (n % 2 == 0) ? i : 0;
+                (indices[swapIndex], indices[n - 1]) = (indices[n - 1], indices[swapIndex]);
+            }
+        }
+    } */
