@@ -236,6 +236,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Indice: {fileID: 4731383015800123751, guid: f8bdbb018e5963d4393f53265fe7babc, type: 3}
   descriptionText: {fileID: 1491207462}
+  lineRenderer: {fileID: 1877765342}
 --- !u!4 &157719074
 Transform:
   m_ObjectHideFlags: 0

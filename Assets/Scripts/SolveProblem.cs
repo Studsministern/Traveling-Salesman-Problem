@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,17 +12,17 @@ public class SolveProblem : MonoBehaviour
     // Indices for index and gameobjects
     private int[] indices;
     private GameObject[] gameObjectIndices;
-    
-    // The current best indice combination
     private int[] bestTourIndices;
     private float bestTourDst;
 
     // The ratio of completed solutions compared to the total
     private long currentSolution;
     private long totalSolutions;
+
+    // Calculations before update
     [SerializeField] private int calculcationsBeforeUpdate = 500;
 
-    // The time for starting solve
+    // Keeping track of the time
     private float startTime;
 
     // The Line Controller for drawing the line
@@ -32,12 +31,12 @@ public class SolveProblem : MonoBehaviour
 
     void Start()
     {
-        // Finding the game manager and Line Controller
+        // Components
         gameManager = GameObject.Find("Game Manager").GetComponent<GameManager>();
         lc = lineRenderer.GetComponent<LineController>();
     }
 
-    public void Solve()
+    public void Solve() // Connected to the Solve-button, using variables from GameManager
     {
         // Intialize variables
         int count = gameManager.Indices.Count;
@@ -56,33 +55,32 @@ public class SolveProblem : MonoBehaviour
         gameObjectIndices = gameManager.Indices.ToArray();
         lc.SetUpLine(gameObjectIndices);
 
-        // The time for starting
+        // Assigning the start time
         startTime = Time.time;
 
-        // Exception for three of fewer indices
-        if (count <= 3)
+        if (count <= 3) // Exception for three of fewer indices
         {
             currentSolution = 1;
             totalSolutions = 1;
-            FewIndicesSolution();
-        }
-        // For four or more indices
-        else
+            EvaluateSolution();
+        } else // For four or more indices
         {
             currentSolution = 0;
             totalSolutions = Factorial(count - 1) / 2;
-
-            /// Lexicographic Order
-            /// Using the lexicographic properties of the array to find all possible combinations
+            
+            // Using coroutine to be able to update every frame. Length - 1 to not move the first point
             StartCoroutine(LexicographicSolutions(indices.Length - 1));
         }
     }
 
+    /// Lexicographic Order
+    /// Using the lexicographic properties of the array to find all possible combinations
+    /// Based on: https://www.quora.com/How-would-you-explain-an-algorithm-that-generates-permutations-using-lexicographic-ordering
     private IEnumerator LexicographicSolutions(int n)
     {
-        while (currentSolution < totalSolutions && !Input.GetKeyDown(KeyCode.Escape))
+        while (currentSolution < totalSolutions && !Input.GetKeyDown(KeyCode.Escape)) // Can use escape to cancel
         {
-            //Debug.Log((currentSolution + 1) + ": [" + string.Join(",", indices) + "].");
+            // Debug.Log((currentSolution + 1) + ": [" + string.Join(",", indices) + "].");
 
             // STEP 1: Find largest x where P[x] < P[x+1]
             int largestX = -1;
@@ -127,19 +125,19 @@ public class SolveProblem : MonoBehaviour
             // Calculate the length of the solution
             EvaluateSolution();
 
-            // Update the program
-            if(currentSolution % calculcationsBeforeUpdate == 0)
+            // Update the program every calculcationsBeforeUpdate frames
+            if (currentSolution % calculcationsBeforeUpdate == 0)
             {
-                lc.UpdateLine(bestTourIndices);
+                UpdateVisualisation();
                 yield return null;
             }
         }
 
-        // Update drawing of the line after everything has been completed
-        lc.UpdateLine(bestTourIndices);
+        // Update the program in the end
+        UpdateVisualisation();
     }
 
-    private void Reverse(int[] array, int index)
+    private void Reverse(int[] array, int index) // Reverse all elements from index to the end in an array
     {
         // Temporary array to store the inverted numbers
         int[] tempArray = new int[array.Length - index];
@@ -161,64 +159,67 @@ public class SolveProblem : MonoBehaviour
     }
 
     private void EvaluateSolution()
-    {
-        // Ignore solutions which are just the reverse of another solution
-        if (indices[0] < indices[indices.Length - 2])
+    {   
+        if (indices.Length <= 3) // For 3 indices
         {
-            // Add to the current solution
-            currentSolution++;
+            // Calculate distance, guaranteed to be the best distance
+            bestTourDst = CalculateTourDistance();
+            System.Array.Copy(indices, bestTourIndices, indices.Length);
 
-            // Calculate length of the path (including returning to start point)
-            float tourDst = 0;
-            for (int i = 0; i < indices.Length; i++)
+            // Update the program
+            UpdateVisualisation();
+            
+        } else // For 4 or more indices
+        {
+            // Ignore solutions which are just the reverse of another solution
+            if (indices[0] < indices[indices.Length - 2])
             {
-                // Starts from 0 --> 1, ends at indices.Length --> 0
-                int nextIndex = (i + 1) % indices.Length;
-                tourDst += LookUpDistance(indices[i], indices[nextIndex]);
+                // Keep track of the current solution
+                currentSolution++;
+
+                // Calculate distance
+                float tourDst = CalculateTourDistance();
+
+                // Save the path indices if this is the best solution found so far
+                if (tourDst < bestTourDst)
+                {
+                    bestTourDst = tourDst;
+
+                    // Keep track of the best tour
+                    System.Array.Copy(indices, bestTourIndices, indices.Length);
+                }
             }
-
-            // Save the path indices if this is the best solution found so far
-            if (tourDst < bestTourDst)
-            {
-                bestTourDst = tourDst;
-
-                // Copy over one array to another
-                System.Array.Copy(indices, bestTourIndices, indices.Length);
-            }
-
-            UpdateText();
         }
     }
 
-    private void FewIndicesSolution()
+    private float CalculateTourDistance() // Distance of the current tour
     {
         float tourDst = 0;
+        
+        // Calculate length of the path (including returning to start point)
         for (int i = 0; i < indices.Length; i++)
         {
             // Starts from 0 --> 1, ends at indices.Length --> 0
             int nextIndex = (i + 1) % indices.Length;
-            tourDst += LookUpDistance(indices[i], indices[nextIndex]);
+            tourDst += LookUpDistance(gameObjectIndices, indices[i], indices[nextIndex]);
         }
-        bestTourDst = tourDst;
-        System.Array.Copy(indices, bestTourIndices, indices.Length);
 
-        UpdateText();
-        lc.UpdateLine(bestTourIndices);
+        return tourDst;
     }
 
-    private float LookUpDistance(int index1, int index2)
+    private float LookUpDistance(GameObject[] array, int index1, int index2) // Distance between two points in an array
     {
         if (gameObjectIndices[index1] != null && gameObjectIndices[index2] != null)
         {
-            float dx = gameObjectIndices[index1].transform.position.x - gameObjectIndices[index2].transform.position.x;
-            float dy = gameObjectIndices[index1].transform.position.y - gameObjectIndices[index2].transform.position.y;
+            float dx = array[index1].transform.position.x - array[index2].transform.position.x;
+            float dy = array[index1].transform.position.y - array[index2].transform.position.y;
             return Mathf.Sqrt(Mathf.Pow(dx, 2) + Mathf.Pow(dy, 2));
         }
 
         return 0;
     }
 
-    private long Factorial(int n)
+    private long Factorial(int n) // Calculating n!
     {
         if (n == 1)
         {
@@ -227,40 +228,18 @@ public class SolveProblem : MonoBehaviour
         return n * Factorial(n - 1);
     }
 
-    public void StopSolving()
+    public void StopSolving() // Used to prevent errors when indices are removed when the code is running
     {
         StopAllCoroutines();
     }
 
-    private void UpdateText()
+    private void UpdateVisualisation() // Updating the text showing all stats and the line for the best tour
     {   
         completionText.text = currentSolution + " / " + totalSolutions + "\n"
                             + Math.Round(((double)currentSolution / totalSolutions * 100), 4) + " % \n"
                             + Math.Round(Time.time - startTime, 2) + " seconds \n"
                             + Math.Round(bestTourDst, 2) + " km";
+
+        lc.UpdateLine(bestTourIndices);
     }
 }
-
-
-
-/// Heap's algoritm
-/// Call with length - 1 to keep one element fixed in place. This avoids wasting time
-/// evaluating tours that are identical except for beginning at a different point
-//totalSolutions /= 2;
-//GenerateSolutions(indices.Length - 1);
-
-/* private void GenerateSolutions(int n)
-    {
-        if (n == 1)
-        {
-            EvaluateSolutionHeap();
-        } else
-        {
-            for (int i = 0; i < n; i++)
-            {
-                GenerateSolutions(n - 1);
-                int swapIndex = (n % 2 == 0) ? i : 0;
-                (indices[swapIndex], indices[n - 1]) = (indices[n - 1], indices[swapIndex]);
-            }
-        }
-    } */

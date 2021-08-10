@@ -1,16 +1,18 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
 {
+    // Variables for keeping track of Indice prefab, what text to change and placed indices (encapsulated)
     [SerializeField] private GameObject Indice;
     [SerializeField] private Text descriptionText;
     public List<GameObject> Indices { get; private set; }
+    
+    // Using camera position to keep track of the necessary length of the ray
+    private float rayLength;
 
-    private readonly int rayLength = 10;
-
+    // References to other components
     private LineController lc;
     private SolveProblem sp;
     
@@ -20,20 +22,22 @@ public class GameManager : MonoBehaviour
         lc = GameObject.Find("Line Renderer").GetComponent<LineController>();
         sp = GetComponent<SolveProblem>();
 
-        // Initialise and update
+        // Ray length from the camera position
+        rayLength = Mathf.Abs(Camera.main.transform.position.z);
+
+        // Initialise and update in the beginning
         Indices = new List<GameObject>();
-        UpdateIndices();
     }
 
     // Handle adding more indices and clicking existing ones
     void Update()
     {
-        if (Input.GetMouseButtonDown(0))
+        if (Input.GetMouseButtonDown(0)) // Left click
         {
             HandleRayCast(0);
         }
 
-        else if (Input.GetMouseButtonDown(1))
+        else if (Input.GetMouseButtonDown(1)) // Right click
         {
             HandleRayCast(1);
         }
@@ -46,9 +50,9 @@ public class GameManager : MonoBehaviour
         RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction, rayLength);
 
         // Debug
-        Debug.DrawRay(ray.origin, ray.direction * rayLength, Color.green, 10);
+        // Debug.DrawRay(ray.origin, ray.direction * rayLength, Color.green, 10);
 
-        // Create indice if no collider is where the left mouse button is clicked
+        // CREATE indice if no collider is where the LEFT mouse button is clicked
         if (mouseButtonPressed == 0 && hit.collider == null)
         {
             Vector3 pos = Input.mousePosition;
@@ -57,7 +61,7 @@ public class GameManager : MonoBehaviour
             Instantiate(Indice, pos, Indice.transform.rotation);
             UpdateIndices();
         }
-        // Remove indice if there is one where the right mouse button is clicked
+        // REMOVE indice if there is one where the RIGHT mouse button is clicked
         else if (mouseButtonPressed == 1 && hit.collider != null && hit.collider.gameObject.CompareTag("Indice"))
         {
             Destroy(hit.collider.gameObject);
